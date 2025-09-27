@@ -58,7 +58,7 @@ function App() {
           <Container fluid className="px-4">
             {/* Left side - Brand name only */}
             <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
-              🗳️ DigiVoterz
+              🗳️ DigiVoterzz
             </Navbar.Brand>
             
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
