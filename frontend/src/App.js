@@ -58,7 +58,6 @@ function App() {
 
     return (
       <div className="App">
-<<<<<<< HEAD
         {!isVotingPage && (
           <Navbar bg="white" variant="light" expand="lg" className="shadow-sm border-bottom">
             <Container fluid className="px-4">
@@ -66,46 +65,6 @@ function App() {
               <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
                 🗳️ DigiVoterz
               </Navbar.Brand>
-=======
-        <Navbar bg="white" variant="light" expand="lg" className="shadow-sm border-bottom">
-          <Container fluid className="px-4">
-            {/* Left side - Brand name only */}
-            <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
-              🗳️ DigiVoterzz
-            </Navbar.Brand>
-            
-            <Navbar.Toggle aria-controls="basic-navbar-nav" />
-            <Navbar.Collapse id="basic-navbar-nav">
-              {/* Center - Navigation links */}
-              <Nav className="mx-auto">
-                <Nav.Link as={Link} to="/" className="mx-3 fw-medium text-dark">
-                  Home
-                </Nav.Link>
-                <Nav.Link href="#pricing" className="mx-3 fw-medium text-dark">
-                  Pricing
-                </Nav.Link>
-                {!token && (
-                  <>
-                    <Nav.Link href="#reviews" className="mx-3 fw-medium text-dark">
-                      Reviews
-                    </Nav.Link>
-                    <Nav.Link href="#support" className="mx-3 fw-medium text-dark">
-                      Support
-                    </Nav.Link>
-                  </>
-                )}
-                {token && (
-                  <>
-                    <Nav.Link as={Link} to="/create-election" className="mx-3 fw-medium text-dark">
-                      Create Election
-                    </Nav.Link>
-                    <Nav.Link as={Link} to="/dashboard" className="mx-3 fw-medium text-dark">
-                      Dashboard
-                    </Nav.Link>
-                  </>
-                )}
-              </Nav>
->>>>>>> e2e991bf50bc3ecc281acb4ded98c2ded1158798
               
               <Navbar.Toggle aria-controls="basic-navbar-nav" />
               <Navbar.Collapse id="basic-navbar-nav">
