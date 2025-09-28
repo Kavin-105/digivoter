@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Row, Col, Card, Button, Navbar, Nav } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 const Home = () => {
@@ -209,10 +209,10 @@ const Home = () => {
                 and accessibility for all.
               </p>
               <div style={{display: 'flex', gap: '1rem'}}>
-                <a href="#" style={{color: '#bdc3c7', fontSize: '1.5rem'}}>📧</a>
-                <a href="#" style={{color: '#bdc3c7', fontSize: '1.5rem'}}>📱</a>
-                <a href="#" style={{color: '#bdc3c7', fontSize: '1.5rem'}}>🐦</a>
-                <a href="#" style={{color: '#bdc3c7', fontSize: '1.5rem'}}>💼</a>
+                <span role="button" tabIndex={0} style={{color: '#bdc3c7', fontSize: '1.5rem', cursor: 'pointer'}}>📧</span>
+                <span role="button" tabIndex={0} style={{color: '#bdc3c7', fontSize: '1.5rem', cursor: 'pointer'}}>📱</span>
+                <span role="button" tabIndex={0} style={{color: '#bdc3c7', fontSize: '1.5rem', cursor: 'pointer'}}>🐦</span>
+                <span role="button" tabIndex={0} style={{color: '#bdc3c7', fontSize: '1.5rem', cursor: 'pointer'}}>💼</span>
               </div>
             </Col>
             
@@ -220,10 +220,10 @@ const Home = () => {
             <Col lg={2} md={6}>
               <h6 style={{textTransform: 'uppercase', marginBottom: '1.5rem', fontWeight: '600'}}>Platform</h6>
               <ul style={{listStyle: 'none', padding: 0}}>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Features</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Security</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Pricing</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Case Studies</a></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Features</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Security</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Pricing</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Case Studies</span></li>
               </ul>
             </Col>
             
@@ -231,10 +231,10 @@ const Home = () => {
             <Col lg={2} md={6}>
               <h6 style={{textTransform: 'uppercase', marginBottom: '1.5rem', fontWeight: '600'}}>Resources</h6>
               <ul style={{listStyle: 'none', padding: 0}}>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Documentation</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>API</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Blog</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Webinars</a></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Documentation</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>API</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Blog</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Webinars</span></li>
               </ul>
             </Col>
             
@@ -242,10 +242,10 @@ const Home = () => {
             <Col lg={2} md={6}>
               <h6 style={{textTransform: 'uppercase', marginBottom: '1.5rem', fontWeight: '600'}}>Support</h6>
               <ul style={{listStyle: 'none', padding: 0}}>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Help Center</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Contact Us</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Status</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Training</a></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Help Center</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Contact Us</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Status</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Training</span></li>
               </ul>
             </Col>
             
@@ -253,10 +253,10 @@ const Home = () => {
             <Col lg={2} md={6}>
               <h6 style={{textTransform: 'uppercase', marginBottom: '1.5rem', fontWeight: '600'}}>Legal</h6>
               <ul style={{listStyle: 'none', padding: 0}}>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Privacy Policy</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Terms of Service</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Compliance</a></li>
-                <li style={{marginBottom: '0.75rem'}}><a href="#" style={{color: '#bdc3c7', textDecoration: 'none'}}>Security</a></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Privacy Policy</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Terms of Service</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Compliance</span></li>
+                <li style={{marginBottom: '0.75rem'}}><span style={{color: '#bdc3c7', cursor: 'pointer'}}>Security</span></li>
               </ul>
             </Col>
           </Row>

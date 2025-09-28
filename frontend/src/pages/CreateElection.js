@@ -17,6 +17,10 @@ const CreateElection = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
   });
   const [nominees, setNominees] = useState(['']);
   const [voters, setVoters] = useState([{ name: '', email: '' }]);
@@ -34,34 +38,38 @@ const CreateElection = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [domainRestriction, setDomainRestriction] = useState('');
 
+  // Update the validateEmailDomain function
   const validateEmailDomain = (email) => {
-    if (!domainRestriction) return true; // If no domain restriction, accept all emails
+    if (!domainRestriction) return true;
     
-    const restriction = domainRestriction.toLowerCase().trim();
     const emailLower = email.toLowerCase().trim();
+    const restriction = domainRestriction.toLowerCase().trim();
 
-    // Check if restriction is a pattern (like 23cse@kongu.edu)
     if (restriction.includes('@')) {
-      // Extract the pattern parts
       const [pattern, domain] = restriction.split('@');
-      // Extract the year and department from the pattern (e.g., '23' and 'cse' from '23cse')
       const yearMatch = pattern.match(/\d{2}/);
       const deptMatch = pattern.match(/[a-z]+/);
       
       if (yearMatch && deptMatch) {
         const year = yearMatch[0];
         const dept = deptMatch[0];
-        // Create pattern that allows optional name prefix with optional dot before year and department
-        const fullPattern = new RegExp(`^[a-z]+(\.)?${year}${dept}@${domain.replace('.', '\\.')}$`);
+        // Updated regex to allow optional dot before pattern
+        const fullPattern = new RegExp(`^[a-z]+(\\.)?${year}${dept}@${domain.replace('.', '\\.')}$`);
         return fullPattern.test(emailLower);
       }
       return false;
     } else {
-      // Simple domain validation (e.g., kongu.edu)
       return emailLower.endsWith(`@${restriction}`);
     }
   };
+
   const fileInputRef = useRef(null);
+
+  // Helper function to combine date and time
+  const combineDateTime = (date, time) => {
+    if (!date || !time) return null;
+    return new Date(`${date}T${time}`);
+  };
 
   // Validation functions
   const validateElectionTitle = (title) => {
@@ -71,10 +79,46 @@ const CreateElection = () => {
     if (/^\d/.test(title)) {
       return 'Election title should not start with numbers';
     }
-    if (!/^[a-zA-Z0-9\s\-_,\.!?()]+$/.test(title)) {
+    if (!/^[a-zA-Z0-9\s\-_,.!?()]+$/.test(title)) {
       return 'Title should only contain letters, numbers, spaces, and basic punctuation';
     }
     return '';
+  };
+
+  const validateDateTime = () => {
+    const errors = {};
+    const now = new Date();
+    const start = combineDateTime(formData.startDate, formData.startTime);
+    const end = combineDateTime(formData.endDate, formData.endTime);
+
+    if (!formData.startDate) {
+      errors.startDate = 'Start date is required';
+    }
+    if (!formData.startTime) {
+      errors.startTime = 'Start time is required';
+    }
+    if (!formData.endDate) {
+      errors.endDate = 'End date is required';
+    }
+    if (!formData.endTime) {
+      errors.endTime = 'End time is required';
+    }
+
+    if (start && end) {
+      if (start <= now) {
+        errors.startDate = 'Start date must be in the future';
+      }
+      if (end <= start) {
+        errors.endDate = 'End date must be after start date';
+      }
+      // Check minimum duration (5 minutes)
+      const minDuration = 5 * 60 * 1000;
+      if (end - start < minDuration) {
+        errors.endTime = 'Election must run for at least 5 minutes';
+      }
+    }
+
+    return errors;
   };
 
   const validateName = (name, fieldName) => {
@@ -114,7 +158,6 @@ const CreateElection = () => {
 
   const handleCloseUploadModal = () => {
     setShowUploadModal(false);
-    // Reset modal state after a short delay to ensure modal is closed
     setTimeout(() => {
       resetUploadModal();
     }, 300);
@@ -167,21 +210,18 @@ const CreateElection = () => {
     const uploadedNames = new Set();
     
     data.forEach((row, index) => {
-      const lineNumber = index + 2; // +2 because Excel rows start at 1 and we skip header
+      const lineNumber = index + 2;
       
       try {
-        // Flexible column name matching
         const name = row['Name'] || row['name'] || row['NAME'] || row['Voter Name'] || row['voter name'] || '';
         const email = row['Email'] || row['email'] || row['EMAIL'] || row['Mail'] || row['mail'] || row['Email Address'] || row['email address'] || '';
 
-        // Skip completely empty rows
         if (!name.trim() && !email.trim()) {
           return;
         }
 
         const rowErrors = [];
 
-        // Validate name
         if (!name.trim()) {
           rowErrors.push('Name is required');
         } else {
@@ -190,8 +230,7 @@ const CreateElection = () => {
             rowErrors.push(nameError);
           }
         }
-
-        // Validate email
+      //validate email
         if (!email.trim()) {
           rowErrors.push('Email is required');
         } else {
@@ -213,26 +252,21 @@ const CreateElection = () => {
           }
         }
 
-        // Check for duplicates in uploaded data
         const lowerCaseName = name.toLowerCase().trim();
         const lowerCaseEmail = email.toLowerCase().trim();
 
-        // Check for duplicate names in current upload
         if (uploadedNames.has(lowerCaseName) && name.trim()) {
           rowErrors.push('Duplicate name in this file');
         }
 
-        // Check for duplicate emails in current upload
         if (uploadedEmails.has(lowerCaseEmail) && email.trim()) {
           rowErrors.push('Duplicate email in this file');
         }
 
-        // Check for duplicate names with existing voters
         if (existingNames.includes(lowerCaseName) && name.trim()) {
           rowErrors.push('Name already exists in current voters list');
         }
 
-        // Check for duplicate emails with existing voters
         if (existingEmails.includes(lowerCaseEmail) && email.trim()) {
           rowErrors.push('Email already exists in current voters list');
         }
@@ -270,7 +304,6 @@ const CreateElection = () => {
   const handleAddUploadedVoters = () => {
     if (uploadedVoters.length > 0) {
       setVoters(prevVoters => {
-        // Remove the first default empty voter if it's the only one and is empty
         if (prevVoters.length === 1 && !prevVoters[0].name && !prevVoters[0].email) {
           return [...uploadedVoters];
         }
@@ -291,17 +324,16 @@ const CreateElection = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Voters');
     
-    // Set column widths
     const colWidths = [
-      { wch: 20 }, // Name column
-      { wch: 30 }  // Email column
+      { wch: 20 },
+      { wch: 30 }
     ];
     worksheet['!cols'] = colWidths;
     
     XLSX.writeFile(workbook, 'voters_template.xlsx');
   };
 
-  // Real-time validation for form fields (excluding email)
+  // Real-time validation for form fields
   const validateField = (name, value) => {
     switch (name) {
       case 'title':
@@ -325,6 +357,15 @@ const CreateElection = () => {
         [name]: error
       }));
     }
+
+    // Real-time date/time validation
+    if (name.includes('Date') || name.includes('Time')) {
+      const dateTimeErrors = validateDateTime();
+      setFieldErrors(prev => ({
+        ...prev,
+        ...dateTimeErrors
+      }));
+    }
   };
 
   const handleBlur = (e) => {
@@ -339,16 +380,48 @@ const CreateElection = () => {
       ...prev,
       [name]: error
     }));
+
+    // Validate date/time on blur
+    if (name.includes('Date') || name.includes('Time')) {
+      const dateTimeErrors = validateDateTime();
+      setFieldErrors(prev => ({
+        ...prev,
+        ...dateTimeErrors
+      }));
+    }
+  };
+
+  // Add this function to check for duplicate nominee names
+  const checkDuplicateNominees = (nominees) => {
+    const nameSet = new Set();
+    const duplicates = [];
+    
+    nominees.forEach((nominee, index) => {
+      const nameLower = nominee.trim().toLowerCase();
+      if (nameLower && nameSet.has(nameLower)) {
+        duplicates.push(index);
+      }
+      nameSet.add(nameLower);
+    });
+    
+    return duplicates;
   };
 
   const handleNomineeChange = (index, value) => {
     const updatedNominees = [...nominees];
     updatedNominees[index] = value;
+    
+    // Check for duplicates
+    const duplicates = checkDuplicateNominees(updatedNominees);
+    
     setNominees(updatedNominees);
 
     const errorKey = `nominee-${index}`;
     if (touchedFields[errorKey] || value.trim()) {
-      const error = validateName(value, 'Nominee name');
+      let error = validateName(value, 'Nominee name');
+      if (!error && duplicates.includes(index)) {
+        error = 'This nominee name already exists';
+      }
       setFieldErrors(prev => ({
         ...prev,
         [errorKey]: error
@@ -389,9 +462,29 @@ const CreateElection = () => {
     }
   };
 
+  // Add this function to check for duplicate voter emails
+  const checkDuplicateVoterEmails = (voters) => {
+    const emailSet = new Set();
+    const duplicates = [];
+    
+    voters.forEach((voter, index) => {
+      const emailLower = voter.email.trim().toLowerCase();
+      if (emailLower && emailSet.has(emailLower)) {
+        duplicates.push(index);
+      }
+      emailSet.add(emailLower);
+    });
+    
+    return duplicates;
+  };
+
   const handleVoterChange = (index, field, value) => {
     const updatedVoters = [...voters];
     updatedVoters[index][field] = value;
+    
+    // Check for duplicate emails
+    const duplicates = checkDuplicateVoterEmails(updatedVoters);
+    
     setVoters(updatedVoters);
 
     if (field === 'name') {
@@ -403,6 +496,32 @@ const CreateElection = () => {
           [errorKey]: error
         }));
       }
+    } else if (field === 'email') {
+      const errorKey = `voter-${index}-email`;
+      let error = '';
+      
+      if (value.trim()) {
+        error = validateEmail(value);
+        if (!error && !validateEmailDomain(value)) {
+          if (domainRestriction.includes('@')) {
+            const [pattern, domain] = domainRestriction.toLowerCase().split('@');
+            const yearDept = pattern.match(/(\d{2})([a-z]+)/);
+            if (yearDept) {
+              error = `Email must follow the pattern: username[.optional]${yearDept[1]}${yearDept[2]}@${domain}`;
+            }
+          } else {
+            error = `Email must be from @${domainRestriction} domain`;
+          }
+        }
+        if (!error && duplicates.includes(index)) {
+          error = 'This email address is already in use';
+        }
+      }
+      
+      setFieldErrors(prev => ({
+        ...prev,
+        [errorKey]: error
+      }));
     }
   };
 
@@ -450,6 +569,10 @@ const CreateElection = () => {
       errors.title = titleError;
     }
 
+    // Validate date/time
+    const dateTimeErrors = validateDateTime();
+    Object.assign(errors, dateTimeErrors);
+
     nominees.forEach((nominee, index) => {
       if (nominee.trim()) {
         const nomineeError = validateName(nominee, 'Nominee name');
@@ -473,6 +596,18 @@ const CreateElection = () => {
           errors[`voter-${index}-email`] = emailError;
         }
       }
+    });
+
+    // Check for duplicate nominees
+    const duplicateNominees = checkDuplicateNominees(nominees);
+    duplicateNominees.forEach(index => {
+      errors[`nominee-${index}`] = 'This nominee name already exists';
+    });
+
+    // Check for duplicate voter emails
+    const duplicateVoterEmails = checkDuplicateVoterEmails(voters);
+    duplicateVoterEmails.forEach(index => {
+      errors[`voter-${index}-email`] = 'This email address is already in use';
     });
 
     setFieldErrors(errors);
@@ -533,17 +668,29 @@ const CreateElection = () => {
     }
 
     try {
+      const startDateTime = combineDateTime(formData.startDate, formData.startTime);
+      const endDateTime = combineDateTime(formData.endDate, formData.endTime);
+
       const electionData = {
         title: formData.title,
         description: formData.description,
         nominees: validNominees,
         voters: validVoters,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
       };
 
       const response = await electionAPI.createElection(electionData);
       setSuccess(`Election created successfully! Voting URL: ${response.data.election.votingUrl}`);
       
-      setFormData({ title: '', description: '' });
+      setFormData({ 
+        title: '', 
+        description: '', 
+        startDate: '', 
+        startTime: '', 
+        endDate: '', 
+        endTime: '' 
+      });
       setNominees(['']);
       setVoters([{ name: '', email: '' }]);
       setFieldErrors({});
@@ -560,6 +707,13 @@ const CreateElection = () => {
 
   const shouldShowEmailError = (index) => {
     return emailValidationOnSubmit && fieldErrors[`voter-${index}-email`];
+  };
+
+  // Helper function to format date/time for display
+  const formatDateTime = (date, time) => {
+    if (!date || !time) return 'Not set';
+    const dateTime = combineDateTime(date, time);
+    return dateTime ? dateTime.toLocaleString() : 'Invalid date/time';
   };
 
   // Inline styles
@@ -602,6 +756,17 @@ const CreateElection = () => {
       color: 'white',
       transition: 'all 0.2s ease',
       marginLeft: '0.5rem'
+    },
+    errorText: {
+      color: '#dc3545',
+      fontSize: '0.875rem'
+    },
+    dateTimeSection: {
+      backgroundColor: '#fff3cd',
+      padding: '1rem',
+      borderRadius: '8px',
+      border: '1px solid #ffeaa7',
+      marginBottom: '1rem'
     }
   };
 
@@ -616,7 +781,7 @@ const CreateElection = () => {
         <Alert variant="success" style={{borderRadius: '10px'}}>
           <div>{success}</div>
           <div className="mt-2">
-            <small>Voter credentials have been printed to the server console.</small>
+            <small>Voter credentials have been sent to registered email addresses.</small>
           </div>
         </Alert>
       )}
@@ -647,7 +812,7 @@ const CreateElection = () => {
                     }}
                   />
                   {fieldErrors.title && (
-                    <Form.Text style={{color: '#dc3545', fontSize: '0.875rem'}}>
+                    <Form.Text style={styles.errorText}>
                       {fieldErrors.title}
                     </Form.Text>
                   )}
@@ -665,6 +830,126 @@ const CreateElection = () => {
                     style={{borderRadius: '8px', padding: '0.75rem 1rem'}}
                   />
                 </Form.Group>
+              </Card.Body>
+            </Card>
+
+            {/* Election Schedule Card */}
+            <Card style={styles.card}>
+              <Card.Header style={styles.cardHeader}>
+                <h5 style={{margin: '0', fontSize: '1.25rem', fontWeight: '600'}}>Election Schedule</h5>
+              </Card.Header>
+              <Card.Body>
+                <div style={styles.dateTimeSection}>
+                  <p style={{margin: '0', fontWeight: '600', color: '#856404'}}>
+                    ⏰ Important: Voters can only access the election during the scheduled time period.
+                  </p>
+                </div>
+                
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label style={{fontWeight: '600', color: '#2c3e50'}}>Start Date *</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleFormChange}
+                        onBlur={handleBlur}
+                        required
+                        style={{
+                          borderRadius: '8px',
+                          border: fieldErrors.startDate ? '1px solid #dc3545' : '1px solid #dee2e6',
+                          padding: '0.75rem 1rem'
+                        }}
+                      />
+                      {fieldErrors.startDate && (
+                        <Form.Text style={styles.errorText}>
+                          {fieldErrors.startDate}
+                        </Form.Text>
+                      )}
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label style={{fontWeight: '600', color: '#2c3e50'}}>Start Time *</Form.Label>
+                      <Form.Control
+                        type="time"
+                        name="startTime"
+                        value={formData.startTime}
+                        onChange={handleFormChange}
+                        onBlur={handleBlur}
+                        required
+                        style={{
+                          borderRadius: '8px',
+                          border: fieldErrors.startTime ? '1px solid #dc3545' : '1px solid #dee2e6',
+                          padding: '0.75rem 1rem'
+                        }}
+                      />
+                      {fieldErrors.startTime && (
+                        <Form.Text style={styles.errorText}>
+                          {fieldErrors.startTime}
+                        </Form.Text>
+                      )}
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label style={{fontWeight: '600', color: '#2c3e50'}}>End Date *</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleFormChange}
+                        onBlur={handleBlur}
+                        required
+                        style={{
+                          borderRadius: '8px',
+                          border: fieldErrors.endDate ? '1px solid #dc3545' : '1px solid #dee2e6',
+                          padding: '0.75rem 1rem'
+                        }}
+                      />
+                      {fieldErrors.endDate && (
+                        <Form.Text style={styles.errorText}>
+                          {fieldErrors.endDate}
+                        </Form.Text>
+                      )}
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label style={{fontWeight: '600', color: '#2c3e50'}}>End Time *</Form.Label>
+                      <Form.Control
+                        type="time"
+                        name="endTime"
+                        value={formData.endTime}
+                        onChange={handleFormChange}
+                        onBlur={handleBlur}
+                        required
+                        style={{
+                          borderRadius: '8px',
+                          border: fieldErrors.endTime ? '1px solid #dc3545' : '1px solid #dee2e6',
+                          padding: '0.75rem 1rem'
+                        }}
+                      />
+                      {fieldErrors.endTime && (
+                        <Form.Text style={styles.errorText}>
+                          {fieldErrors.endTime}
+                        </Form.Text>
+                      )}
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                {formData.startDate && formData.startTime && formData.endDate && formData.endTime && (
+                  <Alert variant="info" style={{borderRadius: '8px', marginTop: '1rem'}}>
+                    <strong>Election Schedule Preview:</strong><br/>
+                    <strong>Start:</strong> {formatDateTime(formData.startDate, formData.startTime)}<br/>
+                    <strong>End:</strong> {formatDateTime(formData.endDate, formData.endTime)}
+                  </Alert>
+                )}
               </Card.Body>
             </Card>
 
@@ -699,7 +984,7 @@ const CreateElection = () => {
                       )}
                     </div>
                     {fieldErrors[`nominee-${index}`] && (
-                      <Form.Text style={{color: '#dc3545', fontSize: '0.875rem'}}>
+                      <Form.Text style={styles.errorText}>
                         {fieldErrors[`nominee-${index}`]}
                       </Form.Text>
                     )}
@@ -745,7 +1030,7 @@ const CreateElection = () => {
                           }}
                         />
                         {fieldErrors[`voter-${index}-name`] && (
-                          <Form.Text style={{color: '#dc3545', fontSize: '0.875rem'}}>
+                          <Form.Text style={styles.errorText}>
                             {fieldErrors[`voter-${index}-name`]}
                           </Form.Text>
                         )}
@@ -763,7 +1048,7 @@ const CreateElection = () => {
                           }}
                         />
                         {shouldShowEmailError(index) && (
-                          <Form.Text style={{color: '#dc3545', fontSize: '0.875rem'}}>
+                          <Form.Text style={styles.errorText}>
                             {fieldErrors[`voter-${index}-email`]}
                           </Form.Text>
                         )}
@@ -793,6 +1078,8 @@ const CreateElection = () => {
               </Card.Header>
               <Card.Body>
                 <p><strong>Title:</strong> {formData.title || 'Not set'}</p>
+                <p><strong>Start:</strong> {formatDateTime(formData.startDate, formData.startTime)}</p>
+                <p><strong>End:</strong> {formatDateTime(formData.endDate, formData.endTime)}</p>
                 <p><strong>Nominees:</strong> {nominees.filter(n => n.trim()).length}</p>
                 <p><strong>Voters:</strong> {voters.filter(v => v.name.trim() && v.email.trim()).length}</p>
                 

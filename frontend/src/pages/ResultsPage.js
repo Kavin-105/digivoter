@@ -10,19 +10,19 @@ const ResultsPage = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const fetchResults = async () => {
+      try {
+        const response = await electionAPI.getElectionResults(electionId);
+        setElection(response.data.election);
+      } catch (error) {
+        setError('Failed to load election results');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchResults();
   }, [electionId]);
-
-  const fetchResults = async () => {
-    try {
-      const response = await electionAPI.getElectionResults(electionId);
-      setElection(response.data.election);
-    } catch (error) {
-      setError('Failed to load election results');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getWinner = () => {
     if (!election?.nominees.length) return null;

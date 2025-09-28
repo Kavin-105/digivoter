@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Form, Button, Card, Alert, Row, Col, ListGroup } from 'react-bootstrap';
+import { 
+  Form, 
+  Button, 
+  Card, 
+  Alert, 
+  Row, 
+  Col, 
+  Spinner,
+  Badge,
+  ProgressBar
+} from 'react-bootstrap';
 import { electionAPI, votingAPI } from '../services/api';
 
 const VotingPage = () => {
@@ -8,267 +18,553 @@ const VotingPage = () => {
   const [election, setElection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Voting states
-  const [step, setStep] = useState('credentials'); // 'credentials', 'voting', 'success'
-  const [credentials, setCredentials] = useState({
-    voterId: '',
-    voterKey: '',
-  });
-  const [verifiedVoter, setVerifiedVoter] = useState(null);
+  // Voting form states
+  const [voterId, setVoterId] = useState('');
+  const [voterKey, setVoterKey] = useState('');
   const [selectedNominee, setSelectedNominee] = useState('');
-  const [voting, setVoting] = useState(false);
-  const [voteSuccess, setVoteSuccess] = useState('');
+  const [voterVerified, setVoterVerified] = useState(false);
+  const [verifiedVoter, setVerifiedVoter] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
 
   useEffect(() => {
+    const fetchElection = async () => {
+      try {
+        const response = await electionAPI.getElectionForVoting(votingUrl);
+        setElection(response.data.election);
+      } catch (error) {
+        setError(error.response?.data?.message || 'Election not found');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchElection();
+    
+    // Set up timer for real-time updates every second
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timer);
   }, [votingUrl]);
 
-  const fetchElection = async () => {
-    try {
-      const response = await electionAPI.getElectionForVoting(votingUrl);
-      setElection(response.data.election);
-    } catch (error) {
-      setError('Election not found or invalid voting URL');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCredentialsChange = (e) => {
-    setCredentials({
-      ...credentials,
-      [e.target.name]: e.target.value.toUpperCase(),
-    });
-  };
-
-  const verifyCredentials = async (e) => {
+  const handleVerifyCredentials = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError('');
 
     try {
       const response = await votingAPI.verifyVoter({
         votingUrl,
-        voterId: credentials.voterId,
-        voterKey: credentials.voterKey,
+        voterId: voterId.trim(),
+        voterKey: voterKey.trim()
       });
       
       setVerifiedVoter(response.data.voter);
-      setStep('voting');
+      setVoterVerified(true);
     } catch (error) {
       setError(error.response?.data?.message || 'Invalid credentials');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const castVote = async (e) => {
+  const handleCastVote = async (e) => {
     e.preventDefault();
     if (!selectedNominee) {
-      setError('Please select a nominee');
+      setError('Please select a candidate');
       return;
     }
 
-    setVoting(true);
+    setSubmitting(true);
     setError('');
 
     try {
       const response = await votingAPI.castVote({
         votingUrl,
-        voterId: credentials.voterId,
-        voterKey: credentials.voterKey,
-        nomineeId: selectedNominee,
+        voterId: voterId.trim(),
+        voterKey: voterKey.trim(),
+        nomineeId: selectedNominee
       });
-
-      setVoteSuccess(response.data.message);
-      setStep('success');
+      
+      setSuccess(response.data.message);
+      setVoteSubmitted(true);
     } catch (error) {
       setError(error.response?.data?.message || 'Failed to cast vote');
     } finally {
-      setVoting(false);
+      setSubmitting(false);
     }
   };
 
-  if (loading && !election) {
+  // Helper function to get election status based on time
+  const getElectionStatus = () => {
+    if (!election) return null;
+    
+    const now = currentTime;
+    const startDate = new Date(election.startDate);
+    const endDate = new Date(election.endDate);
+
+    if (election.status === 'closed') {
+      return { status: 'closed', text: 'Election Closed', variant: 'secondary' };
+    }
+    
+    if (now < startDate) {
+      return { status: 'not-started', text: 'Not Started', variant: 'warning' };
+    } else if (now > endDate) {
+      return { status: 'expired', text: 'Election Ended', variant: 'danger' };
+    } else {
+      return { status: 'active', text: 'Active', variant: 'success' };
+    }
+  };
+
+  // Helper function to get time remaining until election starts or ends
+  const getTimeRemaining = () => {
+    if (!election) return null;
+    
+    const now = currentTime;
+    const startDate = new Date(election.startDate);
+    const endDate = new Date(election.endDate);
+    
+    if (now < startDate) {
+      return {
+        type: 'start',
+        milliseconds: startDate - now,
+        message: 'Election will start in:'
+      };
+    } else if (now < endDate) {
+      return {
+        type: 'end',
+        milliseconds: endDate - now,
+        message: 'Election ends in:'
+      };
+    }
+    
+    return null;
+  };
+
+  // Helper function to format countdown time
+  const formatCountdown = (milliseconds) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const days = Math.floor(totalSeconds / (24 * 60 * 60));
+    const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  // Helper function to format date/time for display
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    });
+  };
+
+  // Styles
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      backgroundColor: '#f8fafc',
+      padding: '2rem 1rem',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    },
+    centerCard: {
+      maxWidth: '600px',
+      margin: '0 auto',
+      border: 'none',
+      borderRadius: '1rem',
+      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      overflow: 'hidden'
+    },
+    cardHeader: {
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: 'white',
+      padding: '2rem',
+      textAlign: 'center',
+      border: 'none'
+    },
+    title: {
+      fontSize: '1.5rem',
+      fontWeight: '700',
+      margin: '0 0 0.5rem 0'
+    },
+    subtitle: {
+      fontSize: '1rem',
+      opacity: '0.9',
+      margin: '0'
+    },
+    statusBadge: {
+      fontSize: '0.875rem',
+      padding: '0.5rem 1rem',
+      borderRadius: '9999px',
+      fontWeight: '600',
+      marginTop: '1rem'
+    },
+    scheduleCard: {
+      backgroundColor: '#f0f9ff',
+      border: '1px solid #bae6fd',
+      borderRadius: '0.5rem',
+      padding: '1.5rem',
+      margin: '1.5rem 0',
+      textAlign: 'center'
+    },
+    scheduleTitle: {
+      fontSize: '1.125rem',
+      fontWeight: '600',
+      color: '#0369a1',
+      marginBottom: '1rem'
+    },
+    scheduleTime: {
+      fontSize: '0.875rem',
+      color: '#0369a1',
+      margin: '0.5rem 0'
+    },
+    countdownCard: {
+      backgroundColor: '#fef3c7',
+      border: '1px solid #fbbf24',
+      borderRadius: '0.5rem',
+      padding: '1rem',
+      textAlign: 'center',
+      marginTop: '1rem'
+    },
+    countdownText: {
+      fontSize: '0.875rem',
+      color: '#92400e',
+      fontWeight: '600',
+      marginBottom: '0.5rem'
+    },
+    countdownTime: {
+      fontSize: '1.25rem',
+      color: '#92400e',
+      fontWeight: '700',
+      fontFamily: 'monospace'
+    },
+    alertNotStarted: {
+      backgroundColor: '#fff3cd',
+      borderColor: '#ffeaa7',
+      color: '#856404',
+      borderRadius: '0.5rem',
+      padding: '1.5rem',
+      textAlign: 'center',
+      marginBottom: '2rem'
+    },
+    alertExpired: {
+      backgroundColor: '#fee2e2',
+      borderColor: '#fecaca',
+      color: '#991b1b',
+      borderRadius: '0.5rem',
+      padding: '1.5rem',
+      textAlign: 'center',
+      marginBottom: '2rem'
+    },
+    formSection: {
+      padding: '2rem'
+    },
+    input: {
+      borderRadius: '0.5rem',
+      border: '1px solid #d1d5db',
+      padding: '0.75rem 1rem',
+      fontSize: '1rem',
+      transition: 'border-color 0.2s ease',
+      width: '100%'
+    },
+    button: {
+      borderRadius: '0.5rem',
+      padding: '0.75rem 1.5rem',
+      fontWeight: '600',
+      fontSize: '1rem',
+      transition: 'all 0.2s ease',
+      width: '100%'
+    },
+    primaryButton: {
+      backgroundColor: '#1d4ed8',
+      borderColor: '#1d4ed8',
+      color: 'white'
+    },
+    successButton: {
+      backgroundColor: '#059669',
+      borderColor: '#059669',
+      color: 'white'
+    },
+    nomineeCard: {
+      border: '1px solid #e5e7eb',
+      borderRadius: '0.5rem',
+      padding: '1rem',
+      marginBottom: '0.75rem',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      backgroundColor: 'white'
+    },
+    nomineeCardSelected: {
+      borderColor: '#3b82f6',
+      backgroundColor: '#eff6ff',
+      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+    },
+    loadingSpinner: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '3rem',
+      gap: '1rem'
+    },
+    progressSection: {
+      marginTop: '2rem',
+      padding: '1rem',
+      backgroundColor: '#f9fafb',
+      borderRadius: '0.5rem'
+    }
+  };
+
+  if (loading) {
     return (
-      <Row className="justify-content-center">
-        <Col md={6}>
-          <Card>
-            <Card.Body className="text-center">
-              <div>Loading election...</div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <div style={styles.container}>
+        <Card style={styles.centerCard}>
+          <Card.Body style={styles.loadingSpinner}>
+            <Spinner animation="border" variant="primary" />
+            <p>Loading election...</p>
+          </Card.Body>
+        </Card>
+      </div>
     );
   }
 
   if (error && !election) {
     return (
-      <Row className="justify-content-center">
-        <Col md={6}>
-          <Card>
-            <Card.Body className="text-center">
-              <Alert variant="danger">{error}</Alert>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <div style={styles.container}>
+        <Card style={styles.centerCard}>
+          <Card.Body style={styles.formSection}>
+            <Alert variant="danger">
+              <h4>Election Not Found</h4>
+              <p>{error}</p>
+            </Alert>
+          </Card.Body>
+        </Card>
+      </div>
     );
   }
 
+  const statusInfo = getElectionStatus();
+  const timeInfo = getTimeRemaining();
+
   return (
-    <Row className="justify-content-center">
-      <Col md={8}>
-        {/* Election Header */}
-        <Card className="mb-4">
-          <Card.Header>
-            <h3>{election?.title}</h3>
-          </Card.Header>
-          <Card.Body>
-            <p>{election?.description}</p>
-          </Card.Body>
-        </Card>
+    <div style={styles.container}>
+      <Card style={styles.centerCard}>
+        <Card.Header style={styles.cardHeader}>
+          <h1 style={styles.title}>{election?.title}</h1>
+          <p style={styles.subtitle}>{election?.description}</p>
+          {statusInfo && (
+            <Badge 
+              bg={statusInfo.variant} 
+              style={styles.statusBadge}
+            >
+              {statusInfo.text}
+            </Badge>
+          )}
+        </Card.Header>
 
-        {/* Step 1: Enter Credentials */}
-        {step === 'credentials' && (
-          <Card>
-            <Card.Header>
-              <h5>Enter Your Voting Credentials</h5>
-            </Card.Header>
-            <Card.Body>
-              {error && <Alert variant="danger">{error}</Alert>}
-              <Form onSubmit={verifyCredentials}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Voter ID</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="voterId"
-                    value={credentials.voterId}
-                    onChange={handleCredentialsChange}
-                    placeholder="Enter your Voter ID (e.g., A1B2C3D4)"
-                    required
-                  />
-                  <Form.Text className="text-muted">
-                    Your unique Voter ID was provided to you via email/console
-                  </Form.Text>
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Voter Key</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="voterKey"
-                    value={credentials.voterKey}
-                    onChange={handleCredentialsChange}
-                    placeholder="Enter your Voter Key (e.g., 1A2B3C4D5E6F)"
-                    required
-                  />
-                  <Form.Text className="text-muted">
-                    Your unique Voter Key was provided to you via email/console
-                  </Form.Text>
-                </Form.Group>
-                <Button type="submit" variant="primary" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify Credentials'}
-                </Button>
-              </Form>
-            </Card.Body>
-          </Card>
-        )}
+        <Card.Body style={styles.formSection}>
+          {/* Election Schedule Information */}
+          <div style={styles.scheduleCard}>
+            <h3 style={styles.scheduleTitle}>Election Schedule</h3>
+            <div style={styles.scheduleTime}>
+              <strong>Starts:</strong> {formatDateTime(election?.startDate)}
+            </div>
+            <div style={styles.scheduleTime}>
+              <strong>Ends:</strong> {formatDateTime(election?.endDate)}
+            </div>
+            
+            {timeInfo && (
+              <div style={styles.countdownCard}>
+                <div style={styles.countdownText}>{timeInfo.message}</div>
+                <div style={styles.countdownTime}>
+                  {formatCountdown(timeInfo.milliseconds)}
+                </div>
+              </div>
+            )}
+          </div>
 
-        {/* Step 2: Cast Vote */}
-        {step === 'voting' && (
-          <Card>
-            <Card.Header>
-              <h5>Welcome, {verifiedVoter?.name}!</h5>
-              <small className="text-muted">Select your preferred nominee and cast your vote</small>
-            </Card.Header>
-            <Card.Body>
+          {/* Election Progress */}
+          <div style={styles.progressSection}>
+            <h6>Voting Progress</h6>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span>{election?.votedCount} voted</span>
+              <span>{election?.totalVoters} total voters</span>
+            </div>
+            <ProgressBar 
+              now={(election?.votedCount / election?.totalVoters) * 100} 
+              variant="info"
+              style={{ height: '8px' }}
+            />
+          </div>
+
+          {/* Status-based Content */}
+          {statusInfo?.status === 'not-started' && (
+            <div style={styles.alertNotStarted}>
+              <h4>Election Has Not Started Yet</h4>
+              <p>
+                Voting will begin on {formatDateTime(election?.startDate)}.
+                Please return at the scheduled time to cast your vote.
+              </p>
+            </div>
+          )}
+
+          {statusInfo?.status === 'expired' && (
+            <div style={styles.alertExpired}>
+              <h4>Election Has Ended</h4>
+              <p>
+                Voting ended on {formatDateTime(election?.endDate)}.
+                Thank you for your participation in the democratic process.
+              </p>
+            </div>
+          )}
+
+          {statusInfo?.status === 'closed' && (
+            <div style={styles.alertExpired}>
+              <h4>Election Closed</h4>
+              <p>This election has been closed by the administrator.</p>
+            </div>
+          )}
+
+          {/* Active Voting Section */}
+          {statusInfo?.status === 'active' && !voteSubmitted && (
+            <>
               {error && <Alert variant="danger">{error}</Alert>}
-              <Form onSubmit={castVote}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Select Nominee</Form.Label>
-                  {election?.nominees.map((nominee) => (
-                    <div key={nominee._id} className="mb-2">
+              {success && <Alert variant="success">{success}</Alert>}
+
+              {!voterVerified ? (
+                /* Credential Verification Form */
+                <Form onSubmit={handleVerifyCredentials}>
+                  <h4 className="mb-4">Enter Your Voting Credentials</h4>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Voter ID</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={voterId}
+                          onChange={(e) => setVoterId(e.target.value.toUpperCase())}
+                          placeholder="Enter your Voter ID"
+                          required
+                          style={styles.input}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Voter Key</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={voterKey}
+                          onChange={(e) => setVoterKey(e.target.value.toUpperCase())}
+                          placeholder="Enter your Voter Key"
+                          required
+                          style={styles.input}
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                  <Button 
+                    type="submit" 
+                    disabled={submitting || !voterId || !voterKey}
+                    style={{...styles.button, ...styles.primaryButton}}
+                  >
+                    {submitting ? (
+                      <>
+                        <Spinner size="sm" animation="border" className="me-2" />
+                        Verifying...
+                      </>
+                    ) : (
+                      'Verify Credentials'
+                    )}
+                  </Button>
+                </Form>
+              ) : (
+                /* Voting Form */
+                <Form onSubmit={handleCastVote}>
+                  <Alert variant="success">
+                    <h5>Welcome, {verifiedVoter?.name}!</h5>
+                    <p>Your credentials have been verified. Please select your preferred candidate below.</p>
+                  </Alert>
+
+                  <h4 className="mb-4">Select Your Candidate</h4>
+                  
+                  {election?.nominees?.map((nominee) => (
+                    <div
+                      key={nominee._id}
+                      style={{
+                        ...styles.nomineeCard,
+                        ...(selectedNominee === nominee._id ? styles.nomineeCardSelected : {})
+                      }}
+                      onClick={() => setSelectedNominee(nominee._id)}
+                    >
                       <Form.Check
                         type="radio"
                         id={nominee._id}
                         name="nominee"
                         value={nominee._id}
+                        checked={selectedNominee === nominee._id}
                         onChange={(e) => setSelectedNominee(e.target.value)}
                         label={nominee.name}
+                        style={{ fontSize: '1.125rem', fontWeight: '500' }}
                       />
                     </div>
                   ))}
-                </Form.Group>
-                <div className="d-flex gap-2">
+
                   <Button 
                     type="submit" 
-                    variant="success" 
-                    disabled={voting || !selectedNominee}
+                    disabled={submitting || !selectedNominee}
+                    style={{...styles.button, ...styles.successButton}}
+                    className="mt-3"
                   >
-                    {voting ? 'Casting Vote...' : 'Cast Vote'}
+                    {submitting ? (
+                      <>
+                        <Spinner size="sm" animation="border" className="me-2" />
+                        Casting Vote...
+                      </>
+                    ) : (
+                      'Cast Your Vote'
+                    )}
                   </Button>
-                  <Button 
-                    variant="secondary" 
-                    onClick={() => {
-                      setStep('credentials');
-                      setError('');
-                      setSelectedNominee('');
-                    }}
-                  >
-                    Back to Credentials
-                  </Button>
-                </div>
-              </Form>
-            </Card.Body>
-          </Card>
-        )}
+                </Form>
+              )}
+            </>
+          )}
 
-        {/* Step 3: Success */}
-        {step === 'success' && (
-          <Card>
-            <Card.Body className="text-center">
-              <Alert variant="success">
-                <h5>✅ Vote Cast Successfully!</h5>
-                <p>{voteSuccess}</p>
-              </Alert>
-              <p>Thank you for participating in this election, {verifiedVoter?.name}!</p>
-              <small className="text-muted">
-                Your vote has been securely recorded. You cannot vote again in this election.
-              </small>
-              <div className="mt-3">
-                <Button 
-                  href={`/results/${election?.id}`}
-                  variant="primary"
-                >
-                  View Election Results
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
-        )}
-
-        {/* Election Info Sidebar */}
-        {step !== 'success' && (
-          <Card className="mt-4">
-            <Card.Header>
-              <h6>Election Information</h6>
-            </Card.Header>
-            <Card.Body>
-              <p><strong>Nominees ({election?.nominees.length}):</strong></p>
-              <ListGroup variant="flush">
-                {election?.nominees.map((nominee) => (
-                  <ListGroup.Item key={nominee._id}>
-                    {nominee.name}
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        )}
-      </Col>
-    </Row>
+          {/* Vote Submitted Success */}
+          {voteSubmitted && (
+            <Alert variant="success" className="text-center">
+              <h4>Vote Successfully Submitted!</h4>
+              <p>Thank you for participating in this election. Your vote has been recorded securely.</p>
+              <hr />
+              <p className="mb-0">
+                <strong>Remember:</strong> You cannot vote again in this election.
+                Results will be available after the election ends.
+              </p>
+            </Alert>
+          )}
+        </Card.Body>
+      </Card>
+    </div>
   );
 };
 

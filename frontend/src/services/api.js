@@ -35,19 +35,24 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   login: (credentials) => api.post('/auth/login', credentials),
+  getMe: () => api.get('/auth/me'),
+  changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
 };
 
 export const electionAPI = {
   createElection: (electionData) => api.post('/elections/create-election', electionData),
   getMyElections: () => api.get('/elections/my-elections'),
-  getElectionForVoting: (votingUrl) => api.get(`/elections/vote/${votingUrl}`),
   getElectionResults: (electionId) => api.get(`/elections/results/${electionId}`),
+  getPublicResults: (votingUrl) => api.get(`/elections/public-results/${votingUrl}`),
   deleteElection: (electionId) => api.delete(`/elections/${electionId}`),
+  getElectionForVoting: (votingUrl) => api.get(`/elections/vote/${votingUrl}`),
+  sendResults: (electionId) => api.post(`/elections/send-results/${electionId}`),
 };
 
+// FIXED: Use correct routes that match your backend
 export const votingAPI = {
-  verifyVoter: (credentials) => api.post('/voting/verify-voter', credentials),
-  castVote: (voteData) => api.post('/voting/cast-vote', voteData),
+  verifyVoter: (credentials) => api.post('/elections/verify-voter', credentials),
+  castVote: (voteData) => api.post('/elections/cast-vote', voteData),
 };
 
 export default api;

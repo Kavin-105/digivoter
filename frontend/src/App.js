@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Container, Navbar, Nav, NavDropdown } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import CreateElection from './pages/CreateElection';
 import VotingPage from './pages/VotingPage';
 import ResultsPage from './pages/ResultsPage';
+
 
 function App() {
   const [token, setToken] = useState(null);
@@ -51,84 +52,89 @@ function App() {
     );
   }
 
-  return (
-    <Router>
+  const AppContent = () => {
+    const location = useLocation();
+    const isVotingPage = location.pathname.startsWith('/vote/');
+
+    return (
       <div className="App">
-        <Navbar bg="white" variant="light" expand="lg" className="shadow-sm border-bottom">
-          <Container fluid className="px-4">
-            {/* Left side - Brand name only */}
-            <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
-              🗳️ DigiVoterz
-            </Navbar.Brand>
-            
-            <Navbar.Toggle aria-controls="basic-navbar-nav" />
-            <Navbar.Collapse id="basic-navbar-nav">
-              {/* Center - Navigation links */}
-              <Nav className="mx-auto">
-                <Nav.Link as={Link} to="/" className="mx-3 fw-medium text-dark">
-                  Home
-                </Nav.Link>
-                <Nav.Link href="#pricing" className="mx-3 fw-medium text-dark">
-                  Pricing
-                </Nav.Link>
-                {!token && (
-                  <>
-                    <Nav.Link href="#reviews" className="mx-3 fw-medium text-dark">
-                      Reviews
-                    </Nav.Link>
-                    <Nav.Link href="#support" className="mx-3 fw-medium text-dark">
-                      Support
-                    </Nav.Link>
-                  </>
-                )}
-                {token && (
-                  <>
-                    <Nav.Link as={Link} to="/create-election" className="mx-3 fw-medium text-dark">
-                      Create Election
-                    </Nav.Link>
-                    <Nav.Link as={Link} to="/dashboard" className="mx-3 fw-medium text-dark">
-                      Dashboard
-                    </Nav.Link>
-                  </>
-                )}
-              </Nav>
+        {!isVotingPage && (
+          <Navbar bg="white" variant="light" expand="lg" className="shadow-sm border-bottom">
+            <Container fluid className="px-4">
+              {/* Left side - Brand name only */}
+              <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
+                🗳️ DigiVoterz
+              </Navbar.Brand>
               
-              {/* Right side - Auth buttons/user dropdown */}
-              <Nav className="ms-auto">
-                {token ? (
-                  <NavDropdown 
-                    title={<span className="text-dark fw-medium">{user?.name}</span>} 
-                    id="user-dropdown"
-                    align="end"
-                  >
-                    <NavDropdown.Item onClick={handleLogout}>
-                      Logout
-                    </NavDropdown.Item>
-                  </NavDropdown>
-                ) : (
-                  <>
-                    <Nav.Link 
-                      as={Link} 
-                      to="/login"
-                      className="btn btn-outline-primary btn-sm me-2"
-                      style={{ textDecoration: 'none' }}
+              <Navbar.Toggle aria-controls="basic-navbar-nav" />
+              <Navbar.Collapse id="basic-navbar-nav">
+                {/* Center - Navigation links */}
+                <Nav className="mx-auto">
+                  <Nav.Link as={Link} to="/" className="mx-3 fw-medium text-dark">
+                    Home
+                  </Nav.Link>
+                  <Nav.Link href="#pricing" className="mx-3 fw-medium text-dark">
+                    Pricing
+                  </Nav.Link>
+                  {!token && (
+                    <>
+                      <Nav.Link href="#reviews" className="mx-3 fw-medium text-dark">
+                        Reviews
+                      </Nav.Link>
+                      <Nav.Link href="#support" className="mx-3 fw-medium text-dark">
+                        Support
+                      </Nav.Link>
+                    </>
+                  )}
+                  {token && (
+                    <>
+                      <Nav.Link as={Link} to="/create-election" className="mx-3 fw-medium text-dark">
+                        Create Election
+                      </Nav.Link>
+                      <Nav.Link as={Link} to="/dashboard" className="mx-3 fw-medium text-dark">
+                        Dashboard
+                      </Nav.Link>
+                    </>
+                  )}
+                </Nav>
+                
+                {/* Right side - Auth buttons/user dropdown */}
+                <Nav className="ms-auto">
+                  {token ? (
+                    <NavDropdown 
+                      title={<span className="text-dark fw-medium">{user?.name}</span>} 
+                      id="user-dropdown"
+                      align="end"
                     >
-                      Login
-                    </Nav.Link>
-                    <Nav.Link 
-                      as={Link} 
-                      to="/register"
-                      className="btn btn-primary btn-sm"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      Register
-                    </Nav.Link>
-                  </>
-                )}
-              </Nav>
-            </Navbar.Collapse>
-          </Container>
-        </Navbar>
+                      <NavDropdown.Item onClick={handleLogout}>
+                        Logout
+                      </NavDropdown.Item>
+                    </NavDropdown>
+                  ) : (
+                    <>
+                      <Nav.Link 
+                        as={Link} 
+                        to="/login"
+                        className="btn btn-outline-primary btn-sm me-2"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Login
+                      </Nav.Link>
+                      <Nav.Link 
+                        as={Link} 
+                        to="/register"
+                        className="btn btn-primary btn-sm"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Register
+                      </Nav.Link>
+                    </>
+                  )}
+                </Nav>
+              </Navbar.Collapse>
+            </Container>
+          </Navbar>
+        )}
 
         <Routes>
           <Route path="/" element={<Home />} />
@@ -153,6 +159,12 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
+    );
+  };
+
+  return (
+    <Router>
+      <AppContent />
 
       <style jsx>{`
         .navbar {
