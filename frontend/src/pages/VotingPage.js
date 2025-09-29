@@ -403,19 +403,7 @@ const VotingPage = () => {
             )}
           </div>
 
-          {/* Election Progress */}
-          <div style={styles.progressSection}>
-            <h6>Voting Progress</h6>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span>{election?.votedCount} voted</span>
-              <span>{election?.totalVoters} total voters</span>
-            </div>
-            <ProgressBar 
-              now={(election?.votedCount / election?.totalVoters) * 100} 
-              variant="info"
-              style={{ height: '8px' }}
-            />
-          </div>
+          
 
           {/* Status-based Content */}
           {statusInfo?.status === 'not-started' && (

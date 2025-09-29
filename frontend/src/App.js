@@ -63,7 +63,7 @@ function App() {
             <Container fluid className="px-4">
               {/* Left side - Brand name only */}
               <Navbar.Brand as={Link} to="/" className="fw-bold fs-3 text-primary">
-                🗳️ DigiVoterz
+                  DigiVoterz
               </Navbar.Brand>
               
               <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -168,17 +168,39 @@ function App() {
 
       <style jsx>{`
         .navbar {
+          // border:1px solid black;
           background-color: white !important;
+          width:100%;
+          height:80px;
+          position:sticky;
+          top:0;
+          z-index:10;
+        }
+
+        .navbar-brand {
+          // border:1px solid black;
+          color: #0468ffff !important;
+          width:21%;
+        }
+
+        .navbar-nav{
+          // border:1px solid black;
+          // margin-left:100px;
+          // width:10%;
         }
         
         .navbar-nav .nav-link {
           transition: color 0.3s ease, transform 0.2s ease;
           color: #333 !important;
+          // border:1px solid black;
         }
         
         .navbar-nav .nav-link:hover {
-          color: #0d6efd !important;
+          background-color: #0d6efd !important;
           transform: translateY(-2px);
+          color: white !important;
+          border-radius: 20px;
+          // box-shadow: 0 4px 8px #0d6efd;
         }
         
         .btn-outline-primary:hover {

@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Alert, Row, Col, Spinner, Badge, ProgressBar } from 'react-bootstrap';
+import { Button, Card, Alert, Row, Col, Spinner, Badge, ProgressBar, Container, Dropdown, Form } from 'react-bootstrap';
 import { electionAPI } from '../services/api';
 
 const Dashboard = () => {
   const [elections, setElections] = useState([]);
+  const [filteredElections, setFilteredElections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingElection, setDeletingElection] = useState(null);
   const [sendingResults, setSendingResults] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [dateFilter, setDateFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
@@ -19,10 +22,10 @@ const Dashboard = () => {
       setCurrentTime(new Date());
     }, 1000);
     
-    // Auto-refresh elections data every 5 seconds to show voting progress
+    // Auto-refresh elections data every 30 seconds
     const refreshTimer = setInterval(() => {
       fetchElections();
-    }, 5000);
+    }, 30000);
     
     return () => {
       clearInterval(timer);
@@ -30,19 +33,95 @@ const Dashboard = () => {
     };
   }, []);
 
+  // Filter elections when elections, dateFilter, or statusFilter changes
+  useEffect(() => {
+    filterElections();
+  }, [elections, dateFilter, statusFilter]);
+
   const fetchElections = async () => {
     try {
       const response = await electionAPI.getMyElections();
       setElections(response.data.elections);
-      setError(''); // Clear any previous errors on successful fetch
+      setError('');
     } catch (error) {
       setError('Failed to load elections');
+      console.error('Error fetching elections:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Manual refresh function
+  const filterElections = () => {
+    let filtered = elections;
+
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      
+      switch (dateFilter) {
+        case 'this-month':
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate.getMonth() === now.getMonth() && 
+                   electionDate.getFullYear() === now.getFullYear();
+          });
+          break;
+        case 'last-month':
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate.getMonth() === lastMonth.getMonth() && 
+                   electionDate.getFullYear() === lastMonth.getFullYear();
+          });
+          break;
+        case 'next-month':
+          const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate.getMonth() === nextMonth.getMonth() && 
+                   electionDate.getFullYear() === nextMonth.getFullYear();
+          });
+          break;
+        case 'last-3-months':
+          const last3Months = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate >= last3Months && electionDate < now;
+          });
+          break;
+        case 'next-3-months':
+          const next3Months = new Date(now.getFullYear(), now.getMonth() + 3, 31);
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate > now && electionDate <= next3Months;
+          });
+          break;
+        case 'this-year':
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate.getFullYear() === now.getFullYear();
+          });
+          break;
+        case 'next-year':
+          filtered = filtered.filter(election => {
+            const electionDate = new Date(election.startDate);
+            return electionDate.getFullYear() === now.getFullYear() + 1;
+          });
+          break;
+      }
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(election => {
+        const statusInfo = getElectionStatus(election);
+        return statusInfo.status === statusFilter;
+      });
+    }
+
+    setFilteredElections(filtered);
+  };
+
   const handleRefresh = async () => {
     setLoading(true);
     await fetchElections();
@@ -59,6 +138,7 @@ const Dashboard = () => {
       setElections(elections.filter(election => election._id !== electionId));
     } catch (error) {
       setError('Failed to delete election');
+      console.error('Error deleting election:', error);
     } finally {
       setDeletingElection(null);
     }
@@ -75,12 +155,12 @@ const Dashboard = () => {
       alert('Election results sent successfully to all voters!');
     } catch (error) {
       setError('Failed to send election results');
+      console.error('Error sending results:', error);
     } finally {
       setSendingResults(null);
     }
   };
 
-  // Helper function to get status based on current time
   const getElectionStatus = (election) => {
     const now = currentTime;
     const startDate = new Date(election.startDate);
@@ -99,7 +179,6 @@ const Dashboard = () => {
     }
   };
 
-  // Helper function to format time remaining
   const getTimeRemaining = (election) => {
     const now = currentTime;
     const startDate = new Date(election.startDate);
@@ -116,7 +195,6 @@ const Dashboard = () => {
     }
   };
 
-  // Helper function to format milliseconds to readable time
   const formatTimeRemaining = (milliseconds, prefix) => {
     const totalMinutes = Math.floor(milliseconds / (1000 * 60));
     const totalHours = Math.floor(totalMinutes / 60);
@@ -135,7 +213,6 @@ const Dashboard = () => {
     }
   };
 
-  // Helper function to format date/time for display
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -148,7 +225,37 @@ const Dashboard = () => {
     });
   };
 
-  // Professional styling
+  const getDateFilterDisplayName = () => {
+    const filterNames = {
+      'all': 'All Elections',
+      'this-month': 'This Month',
+      'last-month': 'Last Month',
+      'next-month': 'Next Month',
+      'last-3-months': 'Last 3 Months',
+      'next-3-months': 'Next 3 Months',
+      'this-year': 'This Year',
+      'next-year': 'Next Year'
+    };
+    return filterNames[dateFilter] || 'All Elections';
+  };
+
+  const getStatusFilterDisplayName = () => {
+    const filterNames = {
+      'all': 'All Status',
+      'active': 'Active',
+      'not-started': 'Not Started',
+      'expired': 'Ended',
+      'closed': 'Closed'
+    };
+    return filterNames[statusFilter] || 'All Status';
+  };
+
+  // Calculate dashboard statistics based on filtered elections
+  const totalElections = filteredElections.length;
+  const activeElections = filteredElections.filter(e => getElectionStatus(e).status === 'active').length;
+  const totalVotes = filteredElections.reduce((sum, e) => sum + (e.votedCount || 0), 0);
+  const totalVoters = filteredElections.reduce((sum, e) => sum + (e.votersCount || 0), 0);
+
   const styles = {
     dashboardContainer: {
       padding: '2rem',
@@ -165,123 +272,79 @@ const Dashboard = () => {
     headerTitle: {
       color: '#0f172a',
       fontWeight: '600',
-      fontSize: '1.875rem',
+      fontSize: '2rem',
       marginBottom: '0.5rem',
       letterSpacing: '-0.025em'
     },
     subtitle: {
       color: '#64748b',
-      fontSize: '1rem',
+      fontSize: '1.125rem',
       fontWeight: '400',
       margin: '0'
     },
-    createBtn: {
-      padding: '0.75rem 1.5rem',
-      fontWeight: '600',
-      borderRadius: '0.375rem',
-      border: 'none',
-      fontSize: '0.875rem',
-      backgroundColor: '#1d4ed8',
-      color: 'white',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      cursor: 'pointer',
-      textDecoration: 'none'
-    },
-    loadingSpinner: {
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '60vh',
-      gap: '1rem'
-    },
-    loadingText: {
-      color: '#64748b',
-      fontSize: '0.875rem',
-      fontWeight: '500'
-    },
-    emptyStateCard: {
+    statsCard: {
       border: '1px solid #e2e8f0',
-      borderRadius: '0.5rem',
+      borderRadius: '1rem',
       backgroundColor: 'white',
-      textAlign: 'center',
-      padding: '3rem 2rem',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+      padding: '1.5rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      height: '100%'
     },
-    emptyIcon: {
-      fontSize: '3rem',
-      marginBottom: '1rem',
-      opacity: '0.6'
+    statsIcon: {
+      width: '3.5rem',
+      height: '3.5rem',
+      borderRadius: '0.75rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '1.5rem'
     },
-    emptyTitle: {
+    statsNumber: {
+      fontSize: '2.25rem',
+      fontWeight: '700',
       color: '#0f172a',
       marginBottom: '0.5rem',
-      fontSize: '1.25rem',
-      fontWeight: '600'
+      lineHeight: '1'
     },
-    emptyText: {
+    statsLabel: {
       color: '#64748b',
-      marginBottom: '2rem',
-      fontSize: '0.875rem',
-      lineHeight: '1.6'
-    },
-    electionsHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '1.5rem'
-    },
-    electionsTitle: {
-      color: '#0f172a',
-      fontWeight: '600',
-      fontSize: '1.25rem',
-      margin: '0'
-    },
-    electionsCount: {
-      color: '#64748b',
-      fontSize: '0.875rem',
+      fontSize: '1rem',
       fontWeight: '500'
     },
     electionCard: {
       border: '1px solid #e2e8f0',
-      borderRadius: '1rem',
+      borderRadius: '0.75rem',
       backgroundColor: 'white',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       height: '100%',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
       overflow: 'hidden',
-      cursor: 'default',
-      position: 'relative'
+      cursor: 'default'
     },
     electionCardHeader: {
       borderBottom: '1px solid #e2e8f0',
       background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      padding: '1.5rem 1.5rem',
+      padding: '1rem 1rem',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      gap: '1rem',
-      position: 'relative'
+      gap: '0.75rem'
     },
     electionTitle: {
       color: '#0f172a',
       fontWeight: '600',
       margin: '0',
       fontSize: '1rem',
-      lineHeight: '1.5',
+      lineHeight: '1.4',
       flex: '1'
     },
     electionCardBody: {
-      padding: '1.5rem'
+      padding: '1rem'
     },
     electionDescription: {
       color: '#64748b',
       marginBottom: '1rem',
-      lineHeight: '1.6',
+      lineHeight: '1.5',
       fontSize: '0.875rem'
     },
     scheduleInfo: {
@@ -295,11 +358,16 @@ const Dashboard = () => {
     scheduleTitle: {
       fontWeight: '600',
       color: '#0369a1',
-      marginBottom: '0.25rem'
+      marginBottom: '0.375rem',
+      fontSize: '0.75rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.375rem'
     },
     scheduleTime: {
       color: '#0369a1',
-      margin: '0.125rem 0'
+      margin: '0.125rem 0',
+      fontSize: '0.75rem'
     },
     timeRemaining: {
       backgroundColor: '#fef3c7',
@@ -308,23 +376,26 @@ const Dashboard = () => {
       borderRadius: '0.25rem',
       fontSize: '0.75rem',
       fontWeight: '500',
-      marginTop: '0.5rem'
+      marginTop: '0.5rem',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.25rem'
     },
     electionStats: {
       display: 'grid',
       gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '1rem',
-      marginBottom: '1.5rem'
+      gap: '0.75rem',
+      marginBottom: '1rem'
     },
     statItem: {
-      padding: '1.25rem',
+      padding: '1rem',
       background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      borderRadius: '0.75rem',
+      borderRadius: '0.5rem',
       border: '1px solid #e2e8f0',
       textAlign: 'center',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       cursor: 'default',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
     },
     statNumber: {
       fontSize: '1.5rem',
@@ -345,6 +416,18 @@ const Dashboard = () => {
       fontSize: '0.75rem',
       color: '#94a3b8',
       marginTop: '0.25rem'
+    },
+    progressSection: {
+      marginBottom: '1rem'
+    },
+    progressLabel: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '0.5rem',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      color: '#64748b'
     },
     electionActions: {
       display: 'flex',
@@ -370,43 +453,48 @@ const Dashboard = () => {
       textDecoration: 'none',
       boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
     },
-    copyBtn: {
-      borderColor: '#2563eb',
-      color: '#2563eb'
+    filterSection: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '1.5rem',
+      padding: '1rem',
+      backgroundColor: 'white',
+      borderRadius: '0.75rem',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+      flexWrap: 'wrap',
+      gap: '1rem'
     },
-    resultsBtn: {
-      borderColor: '#059669',
-      color: '#059669'
+    filterTitle: {
+      color: '#0f172a',
+      fontWeight: '600',
+      fontSize: '1.125rem',
+      margin: '0'
     },
-    deleteBtn: {
-      borderColor: '#dc2626',
-      color: '#dc2626',
-      backgroundColor: '#fef2f2'
-    },
-    alertStyle: {
-      borderRadius: '0.375rem',
+    filterCount: {
+      color: '#64748b',
+      fontSize: '0.875rem',
       fontWeight: '500',
-      margin: '0 0 2rem 0',
-      border: '1px solid #fecaca',
-      backgroundColor: '#fef2f2',
-      color: '#dc2626'
+      marginLeft: '1rem'
     },
-    createNewSection: {
-      textAlign: 'center',
-      marginTop: '2rem',
-      paddingTop: '2rem',
-      borderTop: '1px solid #e2e8f0'
+    filterControls: {
+      display: 'flex',
+      gap: '0.75rem',
+      flexWrap: 'wrap'
     }
   };
 
   if (loading) {
     return (
       <div style={styles.dashboardContainer}>
-        <div style={styles.loadingSpinner}>
-          <Spinner animation="border" style={{ color: '#2563eb' }} role="status">
-            <span className="visually-hidden">Loading...</span>
-          </Spinner>
-          <p style={styles.loadingText}>Loading your elections...</p>
+        <div className="d-flex justify-content-center align-items-center" style={{minHeight: '60vh'}}>
+          <div className="text-center">
+            <Spinner animation="border" style={{ color: '#2563eb', width: '3rem', height: '3rem' }} role="status">
+              <span className="visually-hidden">Loading...</span>
+            </Spinner>
+            <p className="mt-3" style={{color: '#64748b', fontSize: '1rem', fontWeight: '500'}}>Loading your elections...</p>
+          </div>
         </div>
       </div>
     );
@@ -414,189 +502,237 @@ const Dashboard = () => {
 
   return (
     <div style={styles.dashboardContainer}>
-      {/* Add CSS for hover effects */}
-      <style jsx>{`
-        .create-btn:hover {
-          background-color: #1e40af !important;
-          transform: translateY(-1px);
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-        }
-        
-        .create-btn:active {
-          transform: translateY(0);
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-        }
-        
+      <style>{`
         .election-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+          transform: translateY(-4px);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
           border-color: #cbd5e1 !important;
-        }
-        
-        .action-btn-copy:hover {
-          background-color: #eff6ff !important;
-          border-color: #1d4ed8 !important;
-          color: #1e40af !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1) !important;
-        }
-        
-        .action-btn-results:hover {
-          background-color: #ecfdf5 !important;
-          border-color: #047857 !important;
-          color: #065f46 !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2), 0 2px 4px -1px rgba(5, 150, 105, 0.1) !important;
-        }
-        
-        .action-btn-send-results:hover {
-          background-color: #eff6ff !important;
-          border-color: #0369a1 !important;
-          color: #0c4a6e !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px -1px rgba(3, 105, 161, 0.2), 0 2px 4px -1px rgba(3, 105, 161, 0.1) !important;
-        }
-        
-        .action-btn-delete:hover {
-          background-color: #fee2e2 !important;
-          border-color: #b91c1c !important;
-          color: #991b1b !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2), 0 2px 4px -1px rgba(220, 38, 38, 0.1) !important;
-        }
-        
-        .action-btn-copy:active,
-        .action-btn-results:active,
-        .action-btn-send-results:active,
-        .action-btn-delete:active {
-          transform: translateY(0) !important;
         }
         
         .stat-item:hover {
-          background-color: #f1f5f9 !important;
+          background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
           border-color: #cbd5e1 !important;
-          transform: translateY(-1px);
+          transform: translateY(-2px);
         }
         
-        .empty-state-card:hover {
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-          border-color: #cbd5e1 !important;
-        }
-        
-        /* Focus states for accessibility */
-        .create-btn:focus {
-          outline: 2px solid #3b82f6;
-          outline-offset: 2px;
-        }
-        
-        .action-btn-copy:focus {
-          outline: 2px solid #3b82f6;
-          outline-offset: 2px;
-        }
-        
-        .action-btn-results:focus {
-          outline: 2px solid #10b981;
-          outline-offset: 2px;
-        }
-        
-        .action-btn-send-results:focus {
-          outline: 2px solid #0ea5e9;
-          outline-offset: 2px;
-        }
-        
-        .action-btn-delete:focus {
-          outline: 2px solid #ef4444;
-          outline-offset: 2px;
-        }
-        
-        /* Smooth transitions for all interactive elements */
-        .create-btn, .election-card, .action-btn-copy, .action-btn-results, .action-btn-send-results, .action-btn-delete, .stat-item, .empty-state-card {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        .action-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px -8px rgba(0, 0, 0, 0.3) !important;
         }
       `}</style>
 
       {/* Header Section */}
       <div style={styles.headerSection}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div className="d-flex justify-content-between align-items-center">
           <div>
             <h1 style={styles.headerTitle}>Dashboard</h1>
             <p style={styles.subtitle}>Welcome back, {user.name}. Manage your elections and monitor voting activity.</p>
           </div>
-          <Button 
-            variant="outline-primary" 
-            size="sm"
-            onClick={handleRefresh}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem'
-            }}
-          >
-            {loading ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                🔄 Refresh
-              </>
-            )}
-          </Button>
+          <div className="d-flex gap-3">
+            <Button 
+              variant="outline-primary" 
+              onClick={handleRefresh}
+              disabled={loading}
+              className="d-flex align-items-center gap-2"
+              style={{fontSize: '0.875rem'}}
+            >
+              <Spinner
+                as="span"
+                animation="border"
+                size="sm"
+                className={loading ? '' : 'd-none'}
+              />
+              {loading ? 'Refreshing...' : '🔄 Refresh'}
+            </Button>
+            <Button 
+              variant="primary"
+              href="/create-election"
+              className="d-flex align-items-center gap-2"
+              style={{fontSize: '0.875rem'}}
+            >
+              ➕ Create Election
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* Statistics Cards */}
+      <Row className="mb-4">
+        <Col lg={3} md={6} className="mb-3">
+          <div style={styles.statsCard}>
+            <div className="d-flex align-items-center gap-3">
+              <div style={{...styles.statsIcon, backgroundColor: '#e7f1ff', color: '#0d6efd'}}>
+                🗳️
+              </div>
+              <div>
+                <div style={styles.statsNumber}>{totalElections}</div>
+                <div style={styles.statsLabel}>Total Elections</div>
+              </div>
+            </div>
+          </div>
+        </Col>
+        <Col lg={3} md={6} className="mb-3">
+          <div style={styles.statsCard}>
+            <div className="d-flex align-items-center gap-3">
+              <div style={{...styles.statsIcon, backgroundColor: '#e6fffa', color: '#198754'}}>
+                📈
+              </div>
+              <div>
+                <div style={styles.statsNumber}>{activeElections}</div>
+                <div style={styles.statsLabel}>Active Elections</div>
+              </div>
+            </div>
+          </div>
+        </Col>
+        <Col lg={3} md={6} className="mb-3">
+          <div style={styles.statsCard}>
+            <div className="d-flex align-items-center gap-3">
+              <div style={{...styles.statsIcon, backgroundColor: '#f3e8ff', color: '#7c3aed'}}>
+                👥
+              </div>
+              <div>
+                <div style={styles.statsNumber}>{totalVotes}</div>
+                <div style={styles.statsLabel}>Total Votes Cast</div>
+              </div>
+            </div>
+          </div>
+        </Col>
+        <Col lg={3} md={6} className="mb-3">
+          <div style={styles.statsCard}>
+            <div className="d-flex align-items-center gap-3">
+              <div style={{...styles.statsIcon, backgroundColor: '#fff4e6', color: '#fd7e14'}}>
+                📊
+              </div>
+              <div>
+                <div style={styles.statsNumber}>
+                  {totalVoters > 0 ? Math.round((totalVotes / totalVoters) * 100) : 0}%
+                </div>
+                <div style={styles.statsLabel}>Average Turnout</div>
+              </div>
+            </div>
+          </div>
+        </Col>
+      </Row>
+
+      {/* Error Alert */}
       {error && (
-        <Alert variant="danger" style={styles.alertStyle} dismissible onClose={() => setError('')}>
-          Failed to load elections. Please try refreshing the page.
+        <Alert variant="danger" dismissible onClose={() => setError('')} className="mb-4">
+          {error}
         </Alert>
       )}
 
-      {elections.length === 0 ? (
-        <Card style={{...styles.emptyStateCard}} className="empty-state-card">
+      {/* Filter Section */}
+      <div style={styles.filterSection}>
+        <div className="d-flex align-items-center">
+          <h2 style={styles.filterTitle}>Elections</h2>
+          <span style={styles.filterCount}>
+            ({filteredElections.length} {(dateFilter !== 'all' || statusFilter !== 'all') ? 'filtered' : 'total'})
+          </span>
+        </div>
+        <div style={styles.filterControls}>
+          {/* Date Filter */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-primary" size="sm" className="d-flex align-items-center gap-2">
+              📅 {getDateFilterDisplayName()}
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              <Dropdown.Item onClick={() => setDateFilter('all')} active={dateFilter === 'all'}>
+                All Elections
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setDateFilter('this-month')} active={dateFilter === 'this-month'}>
+                This Month
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateFilter('last-month')} active={dateFilter === 'last-month'}>
+                Last Month
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateFilter('next-month')} active={dateFilter === 'next-month'}>
+                Next Month
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setDateFilter('last-3-months')} active={dateFilter === 'last-3-months'}>
+                Last 3 Months
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateFilter('next-3-months')} active={dateFilter === 'next-3-months'}>
+                Next 3 Months
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setDateFilter('this-year')} active={dateFilter === 'this-year'}>
+                This Year
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateFilter('next-year')} active={dateFilter === 'next-year'}>
+                Next Year
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+
+          {/* Status Filter */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center gap-2">
+              🔄 {getStatusFilterDisplayName()}
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              <Dropdown.Item onClick={() => setStatusFilter('all')} active={statusFilter === 'all'}>
+                All Status
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setStatusFilter('active')} active={statusFilter === 'active'}>
+                Active
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setStatusFilter('not-started')} active={statusFilter === 'not-started'}>
+                Not Started
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setStatusFilter('expired')} active={statusFilter === 'expired'}>
+                Ended
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setStatusFilter('closed')} active={statusFilter === 'closed'}>
+                Closed
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+      </div>
+
+      {/* Elections */}
+      {filteredElections.length === 0 ? (
+        <Card className="text-center" style={{padding: '4rem 2rem', border: '1px solid #e2e8f0', borderRadius: '1rem'}}>
           <Card.Body>
-            <div style={styles.emptyIcon}>🗳️</div>
-            <h3 style={styles.emptyTitle}>No Elections Created</h3>
-            <p style={styles.emptyText}>
-              Get started by creating your first election. Set up secure online voting with customizable options and real-time results tracking.
+            <div style={{fontSize: '4rem', marginBottom: '1rem', opacity: '0.6'}}>
+              {dateFilter === 'all' ? '🗳️' : '📅'}
+            </div>
+            <h3 style={{color: '#0f172a', marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '600'}}>
+              {dateFilter === 'all' ? 'No Elections Created' : 'No Elections Found'}
+            </h3>
+            <p style={{color: '#64748b', marginBottom: '2rem', fontSize: '1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 2rem'}}>
+              {(dateFilter === 'all' && statusFilter === 'all')
+                ? 'Get started by creating your first election. Set up secure online voting with customizable options and real-time results tracking.'
+                : `No elections found for the selected filters: ${getDateFilterDisplayName()}, ${getStatusFilterDisplayName()}. Try adjusting your filters.`
+              }
             </p>
-            <Button href="/create-election" style={styles.createBtn} className="create-btn">
-              Create Election
-            </Button>
+            {(dateFilter === 'all' && statusFilter === 'all') && (
+              <Button variant="primary" href="/create-election" size="lg">
+                Create Election
+              </Button>
+            )}
           </Card.Body>
         </Card>
       ) : (
         <>
-          <div style={styles.electionsHeader}>
-            <h2 style={styles.electionsTitle}>Elections</h2>
-            <span style={styles.electionsCount}>
-              {elections.length} {elections.length === 1 ? 'election' : 'elections'}
-            </span>
-          </div>
-          
           <Row>
-            {elections.map((election) => {
+            {filteredElections.map((election) => {
               const statusInfo = getElectionStatus(election);
               const timeRemaining = getTimeRemaining(election);
               
               return (
-                <Col lg={6} xl={4} key={election._id} style={{marginBottom: '1.5rem'}}>
+                <Col lg={4} md={6} key={election._id} className="mb-3">
                   <Card style={styles.electionCard} className="election-card">
                     <Card.Header style={styles.electionCardHeader}>
                       <h4 style={styles.electionTitle}>{election.title}</h4>
                       <Badge 
                         bg={statusInfo.variant} 
                         style={{
-                          fontSize: '0.75rem',
-                          padding: '0.25rem 0.75rem',
+                          fontSize: '0.875rem',
+                          padding: '0.5rem 0.75rem',
                           borderRadius: '9999px',
                           fontWeight: '500'
                         }}
@@ -609,7 +745,9 @@ const Dashboard = () => {
                       
                       {/* Election Schedule Information */}
                       <div style={styles.scheduleInfo}>
-                        <div style={styles.scheduleTitle}>📅 Election Schedule</div>
+                        <div style={styles.scheduleTitle}>
+                          📅 Election Schedule
+                        </div>
                         <div style={styles.scheduleTime}>
                           <strong>Start:</strong> {formatDateTime(election.startDate)}
                         </div>
@@ -623,7 +761,7 @@ const Dashboard = () => {
                       
                       <div style={styles.electionStats}>
                         <div style={styles.statItem} className="stat-item">
-                          <span style={styles.statNumber}>{election.nominees.length}</span>
+                          <span style={styles.statNumber}>{election.nominees?.length || 0}</span>
                           <div style={styles.statLabel}>Candidates</div>
                         </div>
                         <div style={styles.statItem} className="stat-item">
@@ -639,12 +777,10 @@ const Dashboard = () => {
                       </div>
                       
                       {/* Voting Progress Bar */}
-                      <div style={{marginBottom: '1rem'}}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
-                          <span style={{fontSize: '0.75rem', fontWeight: '600', color: '#64748b'}}>
-                            📊 Voting Progress
-                          </span>
-                          <span style={{fontSize: '0.75rem', color: '#64748b'}}>
+                      <div style={styles.progressSection}>
+                        <div style={styles.progressLabel}>
+                          📊 Voting Progress
+                          <span>
                             {election.votedCount || 0} of {election.votersCount || 0} votes cast
                           </span>
                         </div>
@@ -657,7 +793,7 @@ const Dashboard = () => {
                                 ? 'warning' 
                                 : 'info'
                           }
-                          style={{height: '8px', borderRadius: '4px'}}
+                          style={{height: '10px', borderRadius: '5px'}}
                         />
                       </div>
                       
@@ -665,36 +801,34 @@ const Dashboard = () => {
                         <Button 
                           variant="outline-primary" 
                           size="sm"
-                          style={{...styles.actionBtn, ...styles.copyBtn}}
-                          className="action-btn-copy"
+                          style={styles.actionBtn}
+                          className="action-btn"
                           onClick={() => {
-                            // Ensure we always have the full URL
-                            const fullUrl = election.votingUrl.includes('http') 
+                            const fullUrl = election.votingUrl?.includes('http') 
                               ? election.votingUrl 
                               : `${window.location.origin}/vote/${election.votingUrl}`;
                             navigator.clipboard.writeText(fullUrl);
                             alert('Voting URL copied to clipboard');
                           }}
                         >
-                          Copy Link
+                          📋 Copy Link
                         </Button>
                         <Button 
                           href={`/results/${election._id}`}
                           variant="outline-success" 
                           size="sm"
-                          style={{...styles.actionBtn, ...styles.resultsBtn}}
-                          className="action-btn-results"
+                          style={styles.actionBtn}
+                          className="action-btn"
                         >
-                          View Results
+                          📊 View Results
                         </Button>
-                        {(election.currentStatus === 'expired' || election.status === 'expired' || 
-                          election.currentStatus === 'ended' || election.status === 'ended' ||
+                        {(statusInfo.status === 'expired' || 
                           (election.endDate && new Date(election.endDate) < currentTime)) && (
                           <Button 
                             variant="outline-info" 
                             size="sm"
-                            style={{...styles.actionBtn, ...styles.resultsBtn}}
-                            className="action-btn-send-results"
+                            style={styles.actionBtn}
+                            className="action-btn"
                             onClick={() => handleSendResults(election._id)}
                             disabled={sendingResults === election._id}
                           >
@@ -717,8 +851,8 @@ const Dashboard = () => {
                         <Button 
                           variant="outline-danger" 
                           size="sm"
-                          style={{...styles.actionBtn, ...styles.deleteBtn}}
-                          className="action-btn-delete"
+                          style={styles.actionBtn}
+                          className="action-btn"
                           onClick={() => handleDeleteElection(election._id)}
                           disabled={deletingElection === election._id}
                         >
@@ -734,7 +868,7 @@ const Dashboard = () => {
                               Deleting...
                             </>
                           ) : (
-                            'Delete'
+                            '🗑️ Delete'
                           )}
                         </Button>
                       </div>
@@ -745,11 +879,7 @@ const Dashboard = () => {
             })}
           </Row>
           
-          <div style={styles.createNewSection}>
-            <Button href="/create-election" style={styles.createBtn} className="create-btn">
-              Create New Election
-            </Button>
-          </div>
+         
         </>
       )}
     </div>
